@@ -273,6 +273,34 @@ test('adds a WSL distro as a host, adds a project on it, and runs a terminal the
       return listed.result.repos.some((repo) => repo.path.endsWith(path.basename(dir)))
     }
 
+    // TEMP e2e-diag
+    page.on('console', (message) => {
+      if (message.text().includes('[e2e-diag]')) {
+        console.log('[client]', message.text())
+      }
+    })
+    console.log(
+      '[e2e-diag] client state',
+      JSON.stringify(
+        await page.evaluate((repoPath) => {
+          const state = window.__store?.getState()
+          const repo = state?.repos.find((entry) => entry.path === repoPath)
+          return {
+            repo,
+            worktrees: repo ? state?.worktreesByRepo[repo.id] : null,
+            detected: repo ? state?.detectedWorktreesByRepo[repo.id] : null
+          }
+        }, projectPath)
+      )
+    )
+    console.log(
+      '[e2e-diag] hub terminals before',
+      JSON.stringify((await hubRuntime.call('terminal.list')).result)
+    )
+    console.log(
+      '[e2e-diag] hub repos before',
+      JSON.stringify((await hubRuntime.call('repo.list')).result)
+    )
     // Removing the project ends its shell on the host and drops it from the host's own catalog,
     // so re-adding the host cannot bring it back.
     expect(await hubTerminalsIn(projectPath)).toBeGreaterThan(0)
@@ -288,6 +316,11 @@ test('adds a WSL distro as a host, adds a project on it, and runs a terminal the
         }
       },
       { repoPath: projectPath, environmentId: WSL_ENVIRONMENT_ID }
+    )
+    await page.waitForTimeout(5_000)
+    console.log(
+      '[e2e-diag] hub terminals after',
+      JSON.stringify((await hubRuntime.call('terminal.list')).result)
     )
     await expect.poll(() => hubTerminalsIn(projectPath), { timeout: 30_000 }).toBe(0)
     await expect.poll(() => hubHasRepo(projectPath), { timeout: 30_000 }).toBe(false)

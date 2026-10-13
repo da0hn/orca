@@ -20,12 +20,16 @@ export async function stopRuntimeProjectTerminalsBeforeRemoval(
     { timeoutMs: 15_000 }
   ).then(
     () => true,
-    () => false
+    (error: unknown) => {
+      console.warn('[e2e-diag] repo.show failed', environmentId, projectId, String(error))
+      return false
+    }
   )
+  console.warn('[e2e-diag] stop pass', environmentId, projectId, hostResolvesProject, worktreeIds)
   if (!hostResolvesProject) {
     return
   }
-  await Promise.allSettled(
+  const settled = await Promise.allSettled(
     worktreeIds.map((worktreeId) =>
       callRuntimeRpc(
         target,
@@ -33,6 +37,12 @@ export async function stopRuntimeProjectTerminalsBeforeRemoval(
         { worktree: toRuntimeWorktreeSelector(worktreeId) },
         { timeoutMs: 15_000 }
       )
+    )
+  )
+  console.warn(
+    '[e2e-diag] stop results',
+    JSON.stringify(
+      settled.map((entry) => (entry.status === 'fulfilled' ? entry.value : String(entry.reason)))
     )
   )
 }
